@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Camera App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        #camera-container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        video {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            background-color: #333;
+        }
+        #controls {
+            margin-top: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #location-data {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #333;
+        }
+        #canvas {
+            display: none;
+        }
+        #result-container {
+            margin-top: 20px;
+        }
+        #captured-image {
+            max-width: 100%;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="camera-container">
+        <h2>GPS Camera</h2>
+        <video id="video" autoplay playsinline></video>
+        
+        <div id="controls">
+            <button id="capture-btn">Capture Photo</button>
+        </div>
+
+        <div id="location-data">
+            Fetching location...
+        </div>
+
+        <canvas id="canvas"></canvas>
+
+        <div id="result-container">
+            <img id="captured-image" alt="Captured view with GPS">
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const captureBtn = document.getElementById('capture-btn');
+        const locationDiv = document.getElementById('location-data');
+        const canvas = document.getElementById('canvas');
+        const capturedImage = document.getElementById('captured-image');
+        
+        let currentCoords = { latitude: null, longitude: null };
+
+        // 1. Request Camera Access
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+                locationDiv.innerText = "Camera access denied or unavailable.";
+            }
+        }
+
+        // 2. Get GPS Coordinates
+        function updateLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentCoords.latitude = position.coords.latitude;
+                        currentCoords.longitude = position.coords.longitude;
+                        locationDiv.innerText = `Lat: ${currentCoords.latitude.toFixed(6)}, Lng: ${currentCoords.longitude.toFixed(6)}`;
+                    },
+                    (error) => {
+                        console.error("Geolocation error:", error);
+                        locationDiv.innerText = "Location access denied or unavailable.";
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else {
+                locationDiv.innerText = "Geolocation is not supported by your browser.";
+            }
+        }
+
+        // 3. Capture Photo and Draw Data
+        captureBtn.addEventListener('click', () => {
+            if (!currentCoords.latitude || !currentCoords.longitude) {
+                alert("Waiting for GPS location. Please wait a moment.");
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw video frame to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Draw text overlay (GPS data)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Lat: ${currentCoords.latitude.toFixed(6)}`, 20, canvas.height - 35);
+            ctx.fillText(`Lng: ${currentCoords.longitude.toFixed(6)}`, 20, canvas.height - 10);
+
+            // Convert canvas to image
+            const imageDataUrl = canvas.toDataURL('image/png');
+            capturedImage.src = imageDataUrl;
+            capturedImage.style.display = 'block';
+        });
+
+        // Initialize
+        initCamera();
+        updateLocation();
+        // Refresh location every 30 seconds
+        setInterval(updateLocation, 30000);
+    </script>
+</body>
+</html>
